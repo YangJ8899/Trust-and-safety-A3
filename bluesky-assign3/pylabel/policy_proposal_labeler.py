@@ -45,7 +45,7 @@ class PolicyLabeler:
         scam_checks += self.check_post_for_emojis(post)
         scam_checks += self.check_post_for_sus_language(post)
 
-        if scam_checks >= 5:
+        if scam_checks >= 4:
             return [POTENTIAL_SCAM]
         return []
 
@@ -80,10 +80,6 @@ class PolicyLabeler:
                 if follow_ratio < 0.1:
                     scam_score += 2
             
-            # Few/no posts but actively following (just here to spam)
-            if posts < 5 and following > 100:
-                scam_score += 2
-            
             posts_to_followers = posts / max(followers, 1)
             if posts_to_followers >= 100:
                 scam_score += 3
@@ -91,7 +87,7 @@ class PolicyLabeler:
                 scam_score += 2
             elif posts_to_followers >= 10:
                 scam_score += 1
-
+            # print(scam_score)
             return scam_score
         except Exception as e:
             print(f"Error checking profile for scam: {e}")
@@ -114,7 +110,7 @@ class PolicyLabeler:
                 scam_score = 1
             else:  # emoji_count > 5
                 scam_score = 2
-            
+            # print(scam_score)
             return scam_score
         
         except Exception as e:
@@ -146,8 +142,10 @@ class PolicyLabeler:
                     moderate_count += 1
             
             if moderate_count >= 3:
-                scam_score = 2
+                scam_score = 3
             elif moderate_count >= 2:
+                scam_score = 2
+            elif moderate_count >= 1:
                 scam_score = 1
             
             return min(scam_score, 3)  # Cap at 3
