@@ -17,17 +17,20 @@ POTENTIAL_SCAM = "Potential URL scam post"
 class PolicyLabeler:
     def __init__(self, client: Client, input_dir):
         self.client = client
+        # Load in our REAL test posts
         self.load_input_dir(input_dir)
+
+        # Load in our synthetic posts
+        self.synthetic_posts = {}
+        synthetic_file = Path(input_dir) / "synthetic_posts.json"
+        if synthetic_file.exists():
+            with open(synthetic_file, 'r') as f:
+                self.synthetic_posts = json.load(f)
 
     def load_input_dir(self, input_dir):
         """
         Load high-risk and moderate-risk phrases from the specified directory
         """
-        # # Load high-sus phrases
-        # self.high_sus_phrases = [
-        #     phrase.lower()
-        #     for phrase in pd.read_csv(f"{input_dir}/high-sus-phrases.csv")["phrase"]
-        # ]
         
         # Load medium-sus phrases
         self.medium_sus_phrases = [
@@ -47,6 +50,9 @@ class PolicyLabeler:
         """
         Apply moderation to the post specified by the given url
         """
+        # Have a different check for synthetic posts
+        if url.startswith("SYNTHETIC"):
+            return self.moderate_synthetic(url)
         scam_checks = 0
         post = post_from_url(self.client, url)
         ## Do our checks here, if X amount return True, we append the label of POTENTIAL_SCAM to the post
@@ -61,6 +67,58 @@ class PolicyLabeler:
             return [POTENTIAL_SCAM]
         return []
 
+    # Vibe coded the function that helps with testing on synthetic posts
+    def moderate_synthetic(self, synthetic_id: str) -> List[str]:
+        """
+        Handle synthetic test posts
+        """
+        if synthetic_id not in self.synthetic_posts:
+            print(f"Warning: Synthetic post {synthetic_id} not found")
+            return []
+        
+        synthetic_data = self.synthetic_posts[synthetic_id]
+        
+        # Create mock post object
+        from unittest.mock import Mock, patch
+        mock_post = Mock()
+        mock_post.value = Mock()
+        mock_post.value.text = synthetic_data['text']
+        mock_post.value.facets = []
+        mock_post.uri = f"at://synthetic/{synthetic_id}"
+        
+        # Parse URLs from text and create facets if needed
+        urls_in_text = re.findall(r'https?://[^\s]+', synthetic_data['text'])
+        if urls_in_text:
+            # Create Link facets for URLs found in text
+            mock_facets = []
+            for url in urls_in_text:
+                mock_facet = Mock()
+                mock_feature = Mock(spec=Link)
+                mock_feature.uri = url
+                mock_facet.features = [mock_feature]
+                mock_facets.append(mock_facet)
+            mock_post.value.facets = mock_facets
+        
+        # Create mock profile
+        mock_profile = Mock()
+        mock_profile.followers_count = synthetic_data['profile']['followers']
+        mock_profile.follows_count = synthetic_data['profile']['following']
+        mock_profile.posts_count = synthetic_data['profile']['posts']
+        
+        # Use patch to mock get_profile
+        with patch.object(self.client, 'get_profile', return_value=mock_profile):
+            scam_checks = 0
+            scam_checks += self.check_profile_for_potential_scam(mock_post)
+            scam_checks += self.check_post_for_emojis(mock_post)
+            scam_checks += self.check_post_for_sus_language(mock_post)
+            scam_checks += self.check_post_for_malicious_urls(mock_post)
+            scam_checks += self.check_post_for_shortened_urls(mock_post)
+            has_url = self.check_post_for_any_url(mock_post)
+            
+            if scam_checks >= 5 and has_url:
+                return [POTENTIAL_SCAM]
+        return []
+        
     def check_profile_for_potential_scam(self, post: GetRecordResponse) -> int:
         """
         Check if the post author's profile exhibits scam-like characteristics, will not catch
