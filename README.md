@@ -153,6 +153,48 @@ https://scam-site.com
 https://phishing-example.com
 ```
 
+## Adding Test Posts
+
+### Adding Real Bluesky Posts
+
+To add real posts from Bluesky to your test dataset:
+
+#### Method 1: Manual Collection
+1. Navigate to the post you want to test on Bluesky web interface
+2. Copy the full URL (format: `https://bsky.app/profile/[handle]/post/[post_id]`)
+3. Manually label the post (is it a scam or not?)
+4. Add to `test_posts.csv`:
+```csv
+URL,Labels
+https://bsky.app/profile/scammer123.bsky.social/post/abc123,["Potential URL scam post"]
+https://bsky.app/profile/legituser.bsky.social/post/xyz789,[]
+```
+
+### Adding Synthetic Test Posts
+
+Synthetic posts allow you to test specific edge cases without relying on real posts.
+
+#### Step 1: Add to `data/synthetic_posts.json`
+```json
+{
+  "SYNTHETIC_051": {
+    "text": "Your post text here with emojis 🚀💰 and hashtags #crypto #trading",
+    "profile": {
+      "posts": 100,
+      "followers": 50,
+      "following": 200
+    },
+    "expected": ["Potential URL scam post"],
+    "reason": "Explanation of why this should/shouldn't be flagged"
+  }
+}
+```
+
+#### Step 2: Add to `test_posts.csv`
+```csv
+URL,Labels
+SYNTHETIC_051,["Potential URL scam post"]
+```
 ---
 
 ## Project Structure
